@@ -26,5 +26,3 @@ build-all-get-checksums: clean build-all
 # Target to clean the build directory
 clean:
 	rm -rf $(OUTPUT_DIR)
-
-.PHONY: build build-all $(PLATFORMS) checksums clean
