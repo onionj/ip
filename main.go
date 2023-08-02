@@ -1,4 +1,4 @@
-/* return ip:port */
+/* return ip */
 
 package main
 
@@ -24,6 +24,12 @@ func main() {
 	checkError(err)
 	fmt.Printf("Start a new listener on %s\n", tcpAddr.String())
 
+	const RESPONSE string = `HTTP/1.1 200 OK
+Content-Length: %d
+Server: Onion
+Content-Type: text/plain; charset=utf-8
+
+%s`
 	for {
 		conn, err := listener.Accept()
 
@@ -33,17 +39,27 @@ func main() {
 
 		go func(conn net.Conn) {
 			defer conn.Close()
+			fmt.Printf("(%s) %s Accepted\n", time.Now().String()[:23], conn.RemoteAddr().String())
+
 			conn.SetDeadline(time.Now().Add(time.Minute))
-			fmt.Printf("(%s):(%s): Accepted\n", time.Now(), conn.RemoteAddr().String())
 
-			response := `HTTP/1.1 200 OK
-Content-Length: %d
-Server: onion
-Content-Type: text/plain; charset=utf-8
+			bf := make([]byte, 256)
+			n, err := conn.Read(bf)
+			if err == nil {
+				fmt.Printf("(%s) Read %d byte from %s\n", time.Now().String()[:23], n, conn.RemoteAddr().String())
+			}
 
-%s`
-			response = fmt.Sprintf(response, len(conn.RemoteAddr().String()), conn.RemoteAddr().String())
-			conn.Write([]byte(response))
+			remoteHost, _, err := net.SplitHostPort(conn.RemoteAddr().String())
+			if err != nil {
+				remoteHost = conn.RemoteAddr().String()
+			}
+
+			response := fmt.Sprintf(RESPONSE, len(remoteHost), remoteHost)
+
+			n, err = conn.Write([]byte(response))
+			if err == nil {
+				fmt.Printf("(%s) Write %d byte to %s\n", time.Now().String()[:23], n, conn.RemoteAddr().String())
+			}
 		}(conn)
 	}
 }

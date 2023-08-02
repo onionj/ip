@@ -1,7 +1,7 @@
 
 # TCP Server Example
 
-This is a simple TCP server written in Go that listens for incoming connections and responds with the client's IP address and port.
+This is a simple HTTP server written in Go that listens for incoming connections and responds the client's IP address.
 
 ## Usage
 ### Method One:
@@ -19,7 +19,7 @@ Replace `'host:port'` with the desired host and port to listen on.
 
 ## How it works
 
-The server uses the `net` package in Go to resolve the TCP address, start a listener, and accept incoming connections. It sets a deadline of one minute for each connection and responds with an HTTP 200 OK message containing the client's IP address and port.
+The server uses the `net` package in Go to resolve the TCP address, start a listener, and accept incoming connections. It sets a deadline of one minute for each connection and responds with an HTTP 200 OK message containing the client's IP address.
 
 ## License
 
