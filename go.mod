@@ -1,3 +1,3 @@
-module ip
+module yourip
 
 go 1.19

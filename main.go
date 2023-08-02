@@ -1,4 +1,7 @@
-/* return ip */
+/*
+  YourIP Server
+  Simple TCP server to return the client's IP address.
+*/
 
 package main
 
@@ -8,6 +11,8 @@ import (
 	"os"
 	"time"
 )
+
+var version string = "" // set it just in Makefile
 
 func main() {
 
@@ -22,7 +27,7 @@ func main() {
 
 	listener, err := net.ListenTCP("tcp", tcpAddr)
 	checkError(err)
-	fmt.Printf("Start a new listener on %s\n", tcpAddr.String())
+	fmt.Printf("Start a new listener on %s\nversion:%s\n", tcpAddr.String(), version)
 
 	const RESPONSE string = `HTTP/1.1 200 OK
 Content-Length: %d

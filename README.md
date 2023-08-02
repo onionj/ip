@@ -1,7 +1,7 @@
 
-# TCP Server Example
+# YourIP Server
 
-This is a simple HTTP server written in Go that listens for incoming connections and responds the client's IP address.
+Simple TCP server to return the client's IP address.
 
 ## Usage
 ### Method One:
