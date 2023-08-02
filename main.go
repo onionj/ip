@@ -48,7 +48,7 @@ Content-Type: text/plain; charset=utf-8
 
 			conn.SetDeadline(time.Now().Add(time.Minute))
 
-			bf := make([]byte, 256)
+			bf := make([]byte, 1024)
 			n, err := conn.Read(bf)
 			if err == nil {
 				fmt.Printf("(%s) Read %d byte from %s\n", time.Now().String()[:23], n, conn.RemoteAddr().String())
