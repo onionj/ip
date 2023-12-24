@@ -1,6 +1,6 @@
 # Define the output directory for the builds
 OUTPUT_DIR := ./build
-version := 1.2.4
+version := 1.4.0
 
 # Define the name of your binary
 BINARY_NAME := yourip
@@ -13,14 +13,14 @@ build:
 	go build -ldflags="-s -w -X main.version=$(version)" -o $(OUTPUT_DIR)/$(BINARY_NAME)
 
 # Target to build for all supported platforms
-build-all: $(addprefix build-,$(PLATFORMS))
+buildall: $(addprefix build-,$(PLATFORMS))
 
 # Individual targets to build for specific platforms
 build-%:
 	GOOS=$(word 1,$(subst -, ,$*)) GOARCH=$(word 2,$(subst -, ,$*)) go build -ldflags="-s -w -X main.version=$(version)" -o $(OUTPUT_DIR)/$(BINARY_NAME)-$(word 1,$(subst -, ,$*))-$(word 2,$(subst -, ,$*))$(if $(findstring windows,$(word 1,$(subst -, ,$*))),.exe)
 
 # Target to generate checksums for the release files
-build-all-get-checksums: clean build-all
+buildall-get-checksums: clean buildall
 	(cd $(OUTPUT_DIR) && shasum -a 256 * > $(BINARY_NAME)-checksums.sha256)
 
 # Target to clean the build directory
