@@ -34,8 +34,8 @@ const (
 )
 
 const (
-	AnimationModeOff   = "0\n"
-	AnimationModeShift = "1\n"
+	AnimationModeBanner = "1\n"
+	AnimationModeFlight = "2\n"
 )
 
 type JsonResponse struct {
@@ -66,7 +66,11 @@ func main() {
 
 // Accept the connection, Prepare Response and send it to client
 func Handler(conn net.Conn) {
-	defer conn.Close()
+	defer func() {
+		conn.Close()
+		fmt.Printf("(%s) %s Closed\n", time.Now().String()[:23], conn.RemoteAddr().String())
+	}()
+
 	fmt.Printf("(%s) %s Accepted\n", time.Now().String()[:23], conn.RemoteAddr().String())
 
 	conn.SetDeadline(time.Now().Add(time.Minute))
@@ -79,28 +83,32 @@ func Handler(conn net.Conn) {
 	}
 
 	response := ""
-	animationMode := AnimationModeOff
+	animationMode := ""
 
 	// Chose response type
 	if numberOfBytes <= 1 {
 		response, _ = CreateResponse(conn.RemoteAddr().String(), ResponseModeText)
 
-	} else if strings.Contains(string(RequestBuffer[:numberOfBytes]), "GET /json") {
-		response, err = CreateResponse(conn.RemoteAddr().String(), ResponseModeHTTPJson)
-		if err != nil {
-			fmt.Println(err.Error())
-			return
-		}
-	} else if string(RequestBuffer[:numberOfBytes]) == AnimationModeShift {
-		response, _ = CreateResponse(conn.RemoteAddr().String(), ResponseModeText)
-		animationMode = AnimationModeShift
-
 	} else {
-		response, _ = CreateResponse(conn.RemoteAddr().String(), ResponseModeHTTPText)
+		request := string(RequestBuffer[:numberOfBytes])
+
+		if strings.Contains(request, "GET /json") {
+			response, err = CreateResponse(conn.RemoteAddr().String(), ResponseModeHTTPJson)
+			if err != nil {
+				fmt.Println(err.Error())
+				return
+			}
+		} else if request == AnimationModeBanner || request == AnimationModeFlight {
+			response, _ = CreateResponse(conn.RemoteAddr().String(), ResponseModeText)
+			animationMode = request
+
+		} else {
+			response, _ = CreateResponse(conn.RemoteAddr().String(), ResponseModeHTTPText)
+		}
 	}
 
 	// Write response to TCP connection
-	if animationMode != AnimationModeOff {
+	if animationMode != "" {
 		StreamAnimation(conn, response, animationMode)
 	} else {
 		numberOfBytes, err = conn.Write([]byte(response))
@@ -148,8 +156,8 @@ func CreateResponse(remoteAddr string, mode ResponseMode) (string, error) {
 // > for example client open a tcp connection with netcat and send `1`
 func StreamAnimation(conn net.Conn, response string, animationMode string) {
 	switch animationMode {
-	case AnimationModeShift:
-		fmt.Printf("(%s) Stream animation to %s (shift)\n", time.Now().String()[:23], conn.RemoteAddr().String())
+	case AnimationModeBanner:
+		fmt.Printf("(%s) Stream animation to %s (Banner)\n", time.Now().String()[:23], conn.RemoteAddr().String())
 
 		faces := []string{"(^_^)", "[o_o]", "(^.^)", "(\".\")", "($.$)"}
 		randomIndex := rand.Intn(len(faces))
@@ -163,9 +171,45 @@ func StreamAnimation(conn net.Conn, response string, animationMode string) {
 			conn.Write([]byte("]"))
 
 			time.Sleep(time.Second / 5)
-			conn.Write([]byte("\x0D"))
+			conn.Write([]byte("\x0D")) // Left
 
+			// shift string
 			response = response[len(response)-1:] + response[:len(response)-1]
+		}
+
+	case AnimationModeFlight:
+		fmt.Printf("(%s) Stream animation to %s (Flight)\n", time.Now().String()[:23], conn.RemoteAddr().String())
+
+		response = "    " + response + "    "
+		flight := `            %s\                                  
+            %s|      |~~\_____/~~\__  |          
+            %s|______ \______====== )-+          
+            %s|              ~~~|/~~  |          
+            %s/                 ()               `
+		flight = fmt.Sprintf(
+			flight,
+			strings.Repeat("-", len(response)),
+			strings.Repeat(" ", len(response)),
+			response,
+			strings.Repeat(" ", len(response)),
+			strings.Repeat("-", len(response)))
+
+		arrayFlight := strings.Split(flight, "\n")
+
+		for {
+			if _, err := conn.Write([]byte(strings.Join(arrayFlight, "\n"))); err != nil {
+				break
+			}
+
+			time.Sleep(time.Second / 8)
+			conn.Write([]byte("\x0D"))      // Left
+			conn.Write([]byte("\u001b[4A")) // 4X Up
+
+			// shift string
+			for indx, lineFlight := range arrayFlight {
+				arrayFlight[indx] = lineFlight[len(lineFlight)-1:] + lineFlight[:len(lineFlight)-1]
+			}
+
 		}
 	}
 }
