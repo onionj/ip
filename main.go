@@ -166,12 +166,10 @@ func StreamAnimation(conn net.Conn, response string, animationMode string) {
 		response += "  " + face + "                  "
 
 		for {
-			conn.Write([]byte("["))
-			conn.Write([]byte(response))
-			conn.Write([]byte("]"))
-
+			if _, err := conn.Write(append(append([]byte(" ["), []byte(response)...), []byte("]\x0D")...)); err != nil {
+				break
+			}
 			time.Sleep(time.Second / 5)
-			conn.Write([]byte("\x0D")) // Left
 
 			// shift string
 			response = response[len(response)-1:] + response[:len(response)-1]
@@ -197,13 +195,12 @@ func StreamAnimation(conn net.Conn, response string, animationMode string) {
 		arrayFlight := strings.Split(flight, "\n")
 
 		for {
-			if _, err := conn.Write([]byte(strings.Join(arrayFlight, "\n"))); err != nil {
+
+			if _, err := conn.Write(append([]byte(strings.Join(arrayFlight, "\n")), []byte("\x0D\u001b[4A")...)); err != nil {
 				break
 			}
 
-			time.Sleep(time.Second / 8)
-			conn.Write([]byte("\x0D"))      // Left
-			conn.Write([]byte("\u001b[4A")) // 4X Up
+			time.Sleep(time.Second / 5)
 
 			// shift string
 			for indx, lineFlight := range arrayFlight {
