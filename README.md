@@ -62,6 +62,8 @@ for example connect to the server with netcat (`nc`) and send `1` or `2`
  `echo -e "1" | nc yourip.top 80` \
  `echo -e "2" | nc yourip.top 80` 
 
+[![Watch the video](./docs_file/example.png)](./docs_file/example.mp4)
+
 ## License
 
 This project is licensed under the [MIT License](https://github.com/onionj/ip/blob/master/LICENSE).
