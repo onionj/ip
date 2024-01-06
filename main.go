@@ -180,9 +180,9 @@ func StreamAnimation(conn net.Conn, response string, animationMode string) {
 
 		response = "    " + response + "    "
 		flight := `            %s\                                  
-            %s|      |~~\_____/~~\__  |          
-            %s|______ \______====== )-+          
-            %s|              ~~~|/~~  |          
+            %s|      |~\______/~~\__  |          
+            %s|______ \_____======= )-+          
+            %s|                 |/    |          
             %s/                 ()               `
 		flight = fmt.Sprintf(
 			flight,
