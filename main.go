@@ -13,6 +13,7 @@ import (
 	"os"
 	"strings"
 	"time"
+	"yourip/geolocation"
 )
 
 var version string = "" // set it just in Makefile
@@ -39,8 +40,11 @@ const (
 )
 
 type JsonResponse struct {
-	IP string `json:"ip"`
+	IP      string `json:"ip"`
+	Country string `json:"country"`
 }
+
+var ipGeolocation *geolocation.IPGeolocation
 
 func main() {
 
@@ -49,6 +53,8 @@ func main() {
 		os.Exit(1)
 	}
 	service := os.Args[1]
+
+	ipGeolocation = geolocation.New(time.Minute * time.Duration(60))
 
 	tcpAddr, err := net.ResolveTCPAddr("tcp4", service)
 	checkError(err)
@@ -87,23 +93,23 @@ func Handler(conn net.Conn) {
 
 	// Chose response type
 	if numberOfBytes <= 1 {
-		response, _ = CreateResponse(conn.RemoteAddr().String(), ResponseModeText)
+		response, _ = CreateResponse(conn, ResponseModeText)
 
 	} else {
 		request := string(RequestBuffer[:numberOfBytes])
 
 		if strings.Contains(request, "GET /json") {
-			response, err = CreateResponse(conn.RemoteAddr().String(), ResponseModeHTTPJson)
+			response, err = CreateResponse(conn, ResponseModeHTTPJson)
 			if err != nil {
 				fmt.Println(err.Error())
 				return
 			}
 		} else if request == AnimationModeBanner || request == AnimationModeFlight {
-			response, _ = CreateResponse(conn.RemoteAddr().String(), ResponseModeText)
+			response, _ = CreateResponse(conn, ResponseModeText)
 			animationMode = request
 
 		} else {
-			response, _ = CreateResponse(conn.RemoteAddr().String(), ResponseModeHTTPText)
+			response, _ = CreateResponse(conn, ResponseModeHTTPText)
 		}
 	}
 
@@ -131,23 +137,26 @@ func checkError(err error) {
 //	simple text: for pure TCP like NetCat
 //	http text:   for browsers and curl
 //	http JSON:   for API Call
-func CreateResponse(remoteAddr string, mode ResponseMode) (string, error) {
-	remoteHost, _, _ := net.SplitHostPort(remoteAddr)
+func CreateResponse(conn net.Conn, mode ResponseMode) (string, error) {
+	remoteAddr := conn.RemoteAddr().(*net.TCPAddr)
+	country, _ := ipGeolocation.Query(remoteAddr.IP)
 
 	switch mode {
 
 	case ResponseModeHTTPText:
-		return fmt.Sprintf(RESPONSE, len(remoteHost), "text/plain", remoteHost), nil
+		response := remoteAddr.IP.String() + " " + country
+		return fmt.Sprintf(RESPONSE, len(response), "text/plain", response), nil
 
 	case ResponseModeHTTPJson:
-		jsonResponse, err := json.Marshal(JsonResponse{IP: remoteHost})
+		jsonResponse := JsonResponse{IP: remoteAddr.IP.String(), Country: country}
+		jsonResponseByte, err := json.Marshal(jsonResponse)
 		if err != nil {
 			return "", fmt.Errorf("failed to marshal message to JSON: %v", err)
 		}
-		return fmt.Sprintf(RESPONSE, len(jsonResponse), "application/json", jsonResponse), nil
+		return fmt.Sprintf(RESPONSE, len(jsonResponseByte), "application/json", jsonResponseByte), nil
 
 	default:
-		return remoteHost, nil
+		return remoteAddr.IP.String() + " " + country, nil
 	}
 }
 
