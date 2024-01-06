@@ -54,7 +54,7 @@ func main() {
 	}
 	service := os.Args[1]
 
-	ipGeolocation = geolocation.New(time.Minute * time.Duration(60))
+	ipGeolocation = geolocation.New(time.Duration(24))
 
 	tcpAddr, err := net.ResolveTCPAddr("tcp4", service)
 	checkError(err)

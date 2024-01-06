@@ -264,7 +264,7 @@ type IPGeolocation struct {
 }
 
 // Init new `IPGeolocation` and set task to refresh countries_ranges
-func New(RefreshPeroid time.Duration) *IPGeolocation {
+func New(RefreshPeroidH time.Duration) *IPGeolocation {
 	ipGeolocation := IPGeolocation{
 		CIDRList: make(map[string][]*net.IPNet),
 		Ready:    false,
@@ -274,13 +274,13 @@ func New(RefreshPeroid time.Duration) *IPGeolocation {
 		ipGeolocation.Load(filename)
 
 		for {
-			if !ipGeolocation.Ready || ipGeolocation.RefreshTime.Add(RefreshPeroid).Before(time.Now()) {
+			if !ipGeolocation.Ready || ipGeolocation.RefreshTime.Add(time.Hour*RefreshPeroidH).Before(time.Now()) {
 				ipGeolocation.RefreshData()
 				fmt.Println("\nCIDR is READY.")
-				time.Sleep(time.Minute * RefreshPeroid)
+				time.Sleep(time.Hour * RefreshPeroidH)
 			} else {
-				fmt.Println("CIDR is Fresh Until", time.Until(ipGeolocation.RefreshTime.Add(RefreshPeroid)))
-				time.Sleep(time.Until(ipGeolocation.RefreshTime.Add(RefreshPeroid)))
+				fmt.Println("CIDR is Fresh Until", time.Until(ipGeolocation.RefreshTime.Add(time.Hour*RefreshPeroidH)))
+				time.Sleep(time.Until(ipGeolocation.RefreshTime.Add(time.Hour * RefreshPeroidH)))
 			}
 		}
 	}()
@@ -320,8 +320,8 @@ func (ig *IPGeolocation) RefreshData() error {
 	lenCountriesCodes := len(CountriesCodes)
 
 	for indx, code := range CountriesCodes {
-		ig.downloadCIDRContent("https://raw.githubusercontent.com/herrbischoff/country-ip-blocks/master/ipv4/"+code+".cidr", code, newCIDRList)
-		ig.downloadCIDRContent("https://raw.githubusercontent.com/herrbischoff/country-ip-blocks/master/ipv6/"+code+".cidr", code, newCIDRList)
+		ig.downloadCIDRContent("https://git.herrbischoff.com/country-ip-blocks-alternative/plain/ipv4/"+code+".netset", code, newCIDRList)
+		ig.downloadCIDRContent("https://git.herrbischoff.com/country-ip-blocks-alternative/plain/ipv6/"+code+".netset", code, newCIDRList)
 		fmt.Println("Down", code, "CIDR", int32((float32(indx+1))/float32(lenCountriesCodes)*100), "% ")
 		fmt.Print("\x0D\u001b[1A")
 	}
