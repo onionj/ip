@@ -293,6 +293,7 @@ func (geo *IPGeolocation) Save(filename string) error {
 	if err != nil {
 		return err
 	}
+	os.Remove(filename)
 	return os.WriteFile(filename, data, 0644)
 }
 
