@@ -289,12 +289,12 @@ func New(RefreshPeroidH time.Duration) *IPGeolocation {
 
 // Save serializes IPGeolocation to a JSON file
 func (geo *IPGeolocation) Save(filename string) error {
-	data, err := json.MarshalIndent(geo, "", "  ")
+	file, err := os.Create(filename)
 	if err != nil {
 		return err
 	}
-	os.Remove(filename)
-	return os.WriteFile(filename, data, 0644)
+
+	return json.NewEncoder(file).Encode(geo)
 }
 
 // Load deserializes IPGeolocation from a JSON file
@@ -304,11 +304,6 @@ func (geo *IPGeolocation) Load(filename string) error {
 		return err
 	}
 	return json.Unmarshal(data, geo)
-}
-
-// ClearCIDRList clears the CIDRList field
-func (geo *IPGeolocation) ClearCIDRList() {
-	geo.CIDRList = make(map[string][]*net.IPNet)
 }
 
 // IsDataFresh checks if the data is still fresh (RefreshTime is within the last 60 minutes)
@@ -372,7 +367,7 @@ func (ig IPGeolocation) Query(ip net.IP) (string, error) {
 		return "", errors.New("IPGeolocation is not ready")
 	}
 
-	for country, _ := range ig.CIDRList {
+	for country := range ig.CIDRList {
 		for _, cidr := range ig.CIDRList[country] {
 			if cidr.Contains(ip) {
 				return country, nil
