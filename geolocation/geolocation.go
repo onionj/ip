@@ -316,8 +316,8 @@ func (ig *IPGeolocation) RefreshData() error {
 	lenCountriesCodes := len(CountriesCodes)
 
 	for indx, code := range CountriesCodes {
-		ig.downloadCIDRContent("https://git.herrbischoff.com/country-ip-blocks-alternative/plain/ipv4/"+code+".netset", code, newCIDRList)
-		ig.downloadCIDRContent("https://git.herrbischoff.com/country-ip-blocks-alternative/plain/ipv6/"+code+".netset", code, newCIDRList)
+		ig.downloadCIDRContent("https://raw.githubusercontent.com/onionj/country-ip-blocks-alternative/master/ipv4/"+code+".netset", code, newCIDRList)
+		ig.downloadCIDRContent("https://raw.githubusercontent.com/onionj/country-ip-blocks-alternative/master/ipv6/"+code+".netset", code, newCIDRList)
 		fmt.Println("Down", code, "CIDR", int32((float32(indx+1))/float32(lenCountriesCodes)*100), "% ")
 		fmt.Print("\x0D\u001b[1A")
 	}
