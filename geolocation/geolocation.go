@@ -258,7 +258,8 @@ var CountriesCodes = []string{
 const filename string = "ipGeolocationCIDR.json"
 
 type IPGeolocation struct {
-	CIDRList    map[string][]*net.IPNet
+	CIDRListV4  map[string][]*net.IPNet
+	CIDRListV6  map[string][]*net.IPNet
 	Ready       bool
 	RefreshTime time.Time
 }
@@ -266,8 +267,9 @@ type IPGeolocation struct {
 // Init new `IPGeolocation` and set task to refresh countries_ranges
 func New(RefreshPeroidH time.Duration) *IPGeolocation {
 	ipGeolocation := IPGeolocation{
-		CIDRList: make(map[string][]*net.IPNet),
-		Ready:    false,
+		CIDRListV4: make(map[string][]*net.IPNet),
+		CIDRListV6: make(map[string][]*net.IPNet),
+		Ready:      false,
 	}
 
 	go func() {
@@ -312,19 +314,22 @@ func (geo *IPGeolocation) IsDataFresh() bool {
 }
 
 func (ig *IPGeolocation) RefreshData() error {
-	newCIDRList := make(map[string][]*net.IPNet)
+	newCIDRListV4 := make(map[string][]*net.IPNet)
+	newCIDRListV6 := make(map[string][]*net.IPNet)
+
 	lenCountriesCodes := len(CountriesCodes)
 
 	for indx, code := range CountriesCodes {
-		ig.downloadCIDRContent("https://raw.githubusercontent.com/onionj/country-ip-blocks-alternative/master/ipv4/"+code+".netset", code, newCIDRList)
-		ig.downloadCIDRContent("https://raw.githubusercontent.com/onionj/country-ip-blocks-alternative/master/ipv6/"+code+".netset", code, newCIDRList)
+		ig.downloadCIDRContent("https://raw.githubusercontent.com/onionj/country-ip-blocks-alternative/master/ipv4/"+code+".netset", code, newCIDRListV4)
+		ig.downloadCIDRContent("https://raw.githubusercontent.com/onionj/country-ip-blocks-alternative/master/ipv6/"+code+".netset", code, newCIDRListV6)
 		fmt.Println("Down", code, "CIDR", int32((float32(indx+1))/float32(lenCountriesCodes)*100), "% ")
 		fmt.Print("\x0D\u001b[1A")
 	}
 
 	ig.Ready = true
 	ig.RefreshTime = time.Now()
-	ig.CIDRList = newCIDRList
+	ig.CIDRListV4 = newCIDRListV4
+	ig.CIDRListV6 = newCIDRListV6
 
 	ig.Save(filename)
 
@@ -358,8 +363,7 @@ func (ig *IPGeolocation) downloadCIDRContent(url string, code string, newCIDRLis
 }
 
 func (ig IPGeolocation) Query(ip net.IP) (string, error) {
-
-	if ip.IsPrivate() {
+	if ip.IsPrivate() || ip.IsLoopback() {
 		return "", errors.New("IP is private")
 	}
 
@@ -367,12 +371,23 @@ func (ig IPGeolocation) Query(ip net.IP) (string, error) {
 		return "", errors.New("IPGeolocation is not ready")
 	}
 
-	for country := range ig.CIDRList {
-		for _, cidr := range ig.CIDRList[country] {
-			if cidr.Contains(ip) {
-				return country, nil
+	if ip.To4() != nil {
+		for country := range ig.CIDRListV4 {
+			for _, cidr := range ig.CIDRListV4[country] {
+				if cidr.Contains(ip) {
+					return country, nil
+				}
+			}
+		}
+	} else {
+		for country := range ig.CIDRListV6 {
+			for _, cidr := range ig.CIDRListV6[country] {
+				if cidr.Contains(ip) {
+					return country, nil
+				}
 			}
 		}
 	}
+
 	return "", errors.New("NotFound")
 }

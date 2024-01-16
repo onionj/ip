@@ -1,6 +1,6 @@
 # Define the output directory for the builds
 OUTPUT_DIR := ./build
-version := 1.6.3
+version := 1.6.4
 
 # Define the name of your binary
 BINARY_NAME := yourip
