@@ -7,6 +7,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"math/rand"
 	"net"
@@ -44,19 +45,25 @@ type JsonResponse struct {
 	Country string `json:"country"`
 }
 
-var ipGeolocation *geolocation.IPGeolocation
+var (
+	bindAddress      string
+	useIPGeolocation bool
+	ipGeolocation    *geolocation.IPGeolocation
+)
 
 func main() {
+	flag.StringVar(&bindAddress, "bind", ":8080", "The address to bind the TCP server to. (shorthand -b)")
+	flag.StringVar(&bindAddress, "b", ":8080", "(shorthand for --bind)")
 
-	if len(os.Args) != 2 {
-		fmt.Println("Usage: ", os.Args[0], "'host:port'")
-		os.Exit(1)
+	flag.BoolVar(&useIPGeolocation, "geolocation", false, "ip geolocation service (shorthand -g)")
+	flag.BoolVar(&useIPGeolocation, "g", false, "(shorthand for --geolocation)")
+	flag.Parse()
+
+	if useIPGeolocation {
+		ipGeolocation = geolocation.New(time.Duration(48))
 	}
-	service := os.Args[1]
 
-	ipGeolocation = geolocation.New(time.Duration(48))
-
-	tcpAddr, err := net.ResolveTCPAddr("tcp4", service)
+	tcpAddr, err := net.ResolveTCPAddr("tcp4", bindAddress)
 	checkError(err)
 
 	listener, err := net.ListenTCP("tcp", tcpAddr)
@@ -139,12 +146,19 @@ func checkError(err error) {
 //	http JSON:   for API Call
 func CreateResponse(conn net.Conn, mode ResponseMode) (string, error) {
 	remoteAddr := conn.RemoteAddr().(*net.TCPAddr)
-	country, _ := ipGeolocation.Query(remoteAddr.IP)
+
+	country := ""
+	separator := ""
+
+	if useIPGeolocation {
+		country, _ = ipGeolocation.Query(remoteAddr.IP)
+		separator = " "
+	}
 
 	switch mode {
 
 	case ResponseModeHTTPText:
-		response := remoteAddr.IP.String() + " " + country
+		response := remoteAddr.IP.String() + separator + country
 		return fmt.Sprintf(RESPONSE, len(response), "text/plain", response), nil
 
 	case ResponseModeHTTPJson:
@@ -156,7 +170,7 @@ func CreateResponse(conn net.Conn, mode ResponseMode) (string, error) {
 		return fmt.Sprintf(RESPONSE, len(jsonResponseByte), "application/json", jsonResponseByte), nil
 
 	default:
-		return remoteAddr.IP.String() + " " + country, nil
+		return remoteAddr.IP.String() + separator + country, nil
 	}
 }
 
@@ -188,11 +202,11 @@ func StreamAnimation(conn net.Conn, response string, animationMode string) {
 		fmt.Printf("(%s) Stream animation to %s (Flight)\n", time.Now().String()[:23], conn.RemoteAddr().String())
 
 		response = "    " + response + "    "
-		flight := `            %s\                                  
-            %s|      |~\______/~~\__  |          
-            %s|______ \_____======= )-+          
-            %s|                 |/    |          
-            %s/                 ()               `
+		flight := ` %s\                                  
+ %s|      |~\______/~~\__  |          
+ %s|______ \_____======= )-+          
+ %s|                 |/    |          
+ %s/                 ()               `
 		flight = fmt.Sprintf(
 			flight,
 			strings.Repeat("-", len(response)),

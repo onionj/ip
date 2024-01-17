@@ -8,31 +8,17 @@ You can access the YourIP Server at [yourip.top](http://yourip.top).
 
 ## Run Server:
 
-### Method One:
-
-
 ```bash
 make
-```
-```bash
-./yourip 'host:port'
+yourip -b 80 -g
 ```
 
-Replace `'host:port'` with the desired host and port to listen on.
-
-For example:
-
-```bash
-./yourip :8080
 ```
-
-### Method Two:
-
-```bash
-go run main.go 'host:port'
+--bind -b
+    The address to bind the TCP server to. (default ":8080")
+--geolocation -g
+    Optional IP geolocation service. (its downlaod Country IP blocks database (70MB) )
 ```
-
-Replace `'host:port'` with the desired host and port to listen on.
 
 ## How it works
 
