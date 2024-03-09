@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"math/rand"
 	"net"
 	"os"
@@ -47,6 +48,7 @@ type JsonResponse struct {
 
 var (
 	bindAddress      string
+	workers          int
 	useIPGeolocation bool
 	ipGeolocation    *geolocation.IPGeolocation
 )
@@ -55,128 +57,121 @@ func main() {
 	flag.StringVar(&bindAddress, "bind", ":8080", "The address to bind the TCP server to. (shorthand -b)")
 	flag.StringVar(&bindAddress, "b", ":8080", "(shorthand for --bind)")
 
+	flag.IntVar(&workers, "worker", 3, "number of workers")
+	flag.IntVar(&workers, "w", 3, "number of workers")
+
 	flag.BoolVar(&useIPGeolocation, "geolocation", false, "ip geolocation service (shorthand -g)")
 	flag.BoolVar(&useIPGeolocation, "g", false, "(shorthand for --geolocation)")
 	flag.Parse()
 
 	if useIPGeolocation {
-		ipGeolocation = geolocation.New(time.Duration(48))
+		ipGeolocation = geolocation.New(time.Duration(100))
 	}
 
 	tcpAddr, err := net.ResolveTCPAddr("tcp4", bindAddress)
-	checkError(err)
-
-	listener, err := net.ListenTCP("tcp", tcpAddr)
-	checkError(err)
-	fmt.Printf("Start a new listener on %s\nversion:%s\n", tcpAddr.String(), version)
-
-	for {
-		if conn, err := listener.Accept(); err == nil {
-			go Handler(conn)
-		}
-	}
-}
-
-// Accept the connection, Prepare Response and send it to client
-func Handler(conn net.Conn) {
-	defer func() {
-		conn.Close()
-		fmt.Printf("(%s) %s Closed\n", time.Now().String()[:23], conn.RemoteAddr().String())
-	}()
-
-	fmt.Printf("(%s) %s Accepted\n", time.Now().String()[:23], conn.RemoteAddr().String())
-
-	conn.SetDeadline(time.Now().Add(time.Minute))
-
-	// Read request from tcp connection
-	RequestBuffer := make([]byte, 1024)
-	numberOfBytes, err := conn.Read(RequestBuffer)
-	if err == nil {
-		fmt.Printf("(%s) Read %d byte from %s\n", time.Now().String()[:23], numberOfBytes, conn.RemoteAddr().String())
-	}
-
-	response := ""
-	animationMode := ""
-
-	// Chose response type
-	if numberOfBytes <= 1 {
-		response, _ = CreateResponse(conn, ResponseModeText)
-
-	} else {
-		request := string(RequestBuffer[:numberOfBytes])
-
-		if strings.Contains(request, "GET /json") {
-			response, err = CreateResponse(conn, ResponseModeHTTPJson)
-			if err != nil {
-				fmt.Println(err.Error())
-				return
-			}
-		} else if request == AnimationModeBanner || request == AnimationModeFlight {
-			response, _ = CreateResponse(conn, ResponseModeText)
-			animationMode = request
-
-		} else {
-			response, _ = CreateResponse(conn, ResponseModeHTTPText)
-		}
-	}
-
-	// Write response to TCP connection
-	if animationMode != "" {
-		StreamAnimation(conn, response, animationMode)
-	} else {
-		numberOfBytes, err = conn.Write([]byte(response))
-		if err == nil {
-			fmt.Printf("(%s) Write %d byte to %s\n", time.Now().String()[:23], numberOfBytes, conn.RemoteAddr().String())
-		}
-	}
-
-}
-
-func checkError(err error) {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Fatal error: %s", err.Error())
 		os.Exit(1)
 	}
+
+	listener, err := net.ListenTCP("tcp", tcpAddr)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Fatal error: %s", err.Error())
+		os.Exit(1)
+	}
+
+	defer listener.Close()
+	fmt.Printf("Start a new listener on %s\nversion:%s\n", tcpAddr.String(), version)
+
+	for ; workers != 0; workers-- {
+		fmt.Println("Runing Worker", workers)
+		go Worker(listener)
+	}
+
+	ch := make(chan struct{})
+	<-ch
 }
 
-// Return Client IP in these formats:
-//
-//	simple text: for pure TCP like NetCat
-//	http text:   for browsers and curl
-//	http JSON:   for API Call
-func CreateResponse(conn net.Conn, mode ResponseMode) (string, error) {
+func Worker(listener *net.TCPListener) {
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			fmt.Println("Accept err:", err)
+			continue
+		}
+
+		fmt.Printf("(%s) %s Accepted\n", time.Now().String()[:23], conn.RemoteAddr().String())
+
+		err = conn.SetDeadline(time.Now().Add(time.Minute))
+		if err != nil {
+			fmt.Println("SetDeadline err:", err)
+			continue
+		}
+
+		go handleConnection(conn)
+	}
+}
+
+func handleConnection(conn net.Conn) {
+
+	defer func() {
+		err := conn.Close()
+		if err != nil {
+			fmt.Printf("(%s) %s Close err: %s\n", time.Now().String()[:23], conn.RemoteAddr().String(), err.Error())
+		} else {
+			fmt.Printf("(%s) %s Closed\n", time.Now().String()[:23], conn.RemoteAddr().String())
+		}
+	}()
+
+	requestBuffer := make([]byte, 1024)
+	bytesRead, err := conn.Read(requestBuffer)
+	if err != nil {
+		if err == io.EOF {
+			fmt.Println("Connection closed by client")
+		} else {
+			fmt.Println("Error reading request:", err)
+			return
+		}
+	}
+
 	remoteAddr := conn.RemoteAddr().(*net.TCPAddr)
+	remoteAddrStr := remoteAddr.IP.String()
 
 	country := ""
-	separator := ""
-
 	if useIPGeolocation {
 		country, _ = ipGeolocation.Query(remoteAddr.IP)
-		separator = " "
 	}
 
-	switch mode {
+	// for netcat client:
+	if bytesRead <= 1 {
+		conn.Write([]byte(fmt.Sprintf("%s %s", remoteAddrStr, country)))
+		return
+	}
 
-	case ResponseModeHTTPText:
-		response := remoteAddr.IP.String() + separator + country
-		return fmt.Sprintf(RESPONSE, len(response), "text/plain", response), nil
+	request := string(requestBuffer[:bytesRead])
 
-	case ResponseModeHTTPJson:
-		jsonResponse := JsonResponse{IP: remoteAddr.IP.String(), Country: country}
-		jsonResponseByte, err := json.Marshal(jsonResponse)
+	if strings.Contains(request, " /json") {
+		jsonResponseByte, err := json.Marshal(JsonResponse{IP: remoteAddrStr, Country: country})
 		if err != nil {
-			return "", fmt.Errorf("failed to marshal message to JSON: %v", err)
+			fmt.Println("create json response err:", err)
+			return
 		}
-		return fmt.Sprintf(RESPONSE, len(jsonResponseByte), "application/json", jsonResponseByte), nil
+		conn.Write([]byte(fmt.Sprintf(RESPONSE, len(jsonResponseByte), "application/json", jsonResponseByte)))
+		return
 
-	default:
-		return remoteAddr.IP.String() + separator + country, nil
+	} else {
+		ipWithCountry := fmt.Sprintf("%s %s", remoteAddrStr, country)
+
+		if request == AnimationModeBanner || request == AnimationModeFlight {
+			StreamAnimation(conn, ipWithCountry, request)
+			return
+		}
+
+		conn.Write([]byte(fmt.Sprintf(RESPONSE, len(ipWithCountry), "text/plain", ipWithCountry)))
 	}
 }
 
-// Stream Client IP Like an Animation!
-//
-// > for example client open a tcp connection with netcat and send `1`
+// Stream Client IP Like an Animation (for example client open a tcp connection with netcat and send `1`)
 func StreamAnimation(conn net.Conn, response string, animationMode string) {
 	switch animationMode {
 	case AnimationModeBanner:

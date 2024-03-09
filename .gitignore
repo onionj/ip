@@ -22,3 +22,4 @@ go.work
 yourip*
 build
 ipGeolocationcidr.json
+.DS_Store
