@@ -191,7 +191,7 @@ func StreamAnimation(conn net.Conn, response string, animationMode string) {
 		}
 
 	case AnimationModeFlight:
-		fmt.Printf("(%s) Stream animation to %s (Flight)\n", time.Now().String()[:23], conn.RemoteAddr().String())
+		fmt.Printf("(%s) Stream animation to %s (Flight)\n", time.Now().String()[:23], response)
 
 		response = "    " + response + "    "
 		flight := ` %s\                                  
