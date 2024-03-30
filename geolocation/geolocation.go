@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -273,11 +275,17 @@ func New(RefreshPeroidH time.Duration) *IPGeolocation {
 	}
 
 	go func() {
-		ipGeolocation.Load(filename)
+		err := ipGeolocation.Load(filename)
+		if err != nil {
+			log.Fatal(err)
+		}
 
 		for {
 			if !ipGeolocation.Ready || ipGeolocation.RefreshTime.Add(time.Hour*RefreshPeroidH).Before(time.Now()) {
-				ipGeolocation.RefreshData()
+				err := ipGeolocation.RefreshData()
+				if err != nil {
+					fmt.Println("err in ipGeolocation.RefreshData", err)
+				}
 				fmt.Println("\nCIDR is READY.")
 				time.Sleep(time.Hour * RefreshPeroidH)
 			} else {
@@ -313,30 +321,39 @@ func (geo *IPGeolocation) IsDataFresh() bool {
 	return time.Since(geo.RefreshTime).Minutes() < 60
 }
 
-func (ig *IPGeolocation) RefreshData() error {
+func (geo *IPGeolocation) RefreshData() error {
 	newCIDRListV4 := make(map[string][]*net.IPNet)
 	newCIDRListV6 := make(map[string][]*net.IPNet)
 
 	lenCountriesCodes := len(CountriesCodes)
 
-	for indx, code := range CountriesCodes {
-		ig.downloadCIDRContent("https://raw.githubusercontent.com/onionj/country-ip-blocks-alternative/master/ipv4/"+code+".netset", code, newCIDRListV4)
-		ig.downloadCIDRContent("https://raw.githubusercontent.com/onionj/country-ip-blocks-alternative/master/ipv6/"+code+".netset", code, newCIDRListV6)
-		fmt.Println("Down", code, "CIDR", int32((float32(indx+1))/float32(lenCountriesCodes)*100), "% ")
+	for index, code := range CountriesCodes {
+		err := geo.downloadCIDRContent("https://raw.githubusercontent.com/onionj/country-ip-blocks-alternative/master/ipv4/"+code+".netset", code, newCIDRListV4)
+		if err != nil {
+			return err
+		}
+		err = geo.downloadCIDRContent("https://raw.githubusercontent.com/onionj/country-ip-blocks-alternative/master/ipv6/"+code+".netset", code, newCIDRListV6)
+		if err != nil {
+			return err
+		}
+		fmt.Println("Down", code, "CIDR", int32((float32(index+1))/float32(lenCountriesCodes)*100), "% ")
 		fmt.Print("\x0D\u001b[1A")
 	}
 
-	ig.Ready = true
-	ig.RefreshTime = time.Now()
-	ig.CIDRListV4 = newCIDRListV4
-	ig.CIDRListV6 = newCIDRListV6
+	geo.Ready = true
+	geo.RefreshTime = time.Now()
+	geo.CIDRListV4 = newCIDRListV4
+	geo.CIDRListV6 = newCIDRListV6
 
-	ig.Save(filename)
+	err := geo.Save(filename)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
 
-func (ig *IPGeolocation) downloadCIDRContent(url string, code string, newCIDRList map[string][]*net.IPNet) error {
+func (geo *IPGeolocation) downloadCIDRContent(url string, code string, newCIDRList map[string][]*net.IPNet) error {
 	response, err := http.Get(url)
 
 	if response.StatusCode != 200 {
@@ -345,7 +362,9 @@ func (ig *IPGeolocation) downloadCIDRContent(url string, code string, newCIDRLis
 	if err != nil {
 		return fmt.Errorf("failed to download CIDR for country code %s: %w", code, err)
 	}
-	defer response.Body.Close()
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(response.Body)
 
 	scanner := bufio.NewScanner(response.Body)
 	for scanner.Scan() {
@@ -357,31 +376,31 @@ func (ig *IPGeolocation) downloadCIDRContent(url string, code string, newCIDRLis
 		return fmt.Errorf("failed to read CIDR for country code %s: %w", code, err)
 	}
 
-	ig.Ready = true
-	ig.RefreshTime = time.Now()
+	geo.Ready = true
+	geo.RefreshTime = time.Now()
 	return nil
 }
 
-func (ig IPGeolocation) Query(ip net.IP) (string, error) {
+func (geo *IPGeolocation) Query(ip net.IP) (string, error) {
 	if ip.IsPrivate() || ip.IsLoopback() {
 		return "", errors.New("IP is private")
 	}
 
-	if !ig.Ready {
+	if !geo.Ready {
 		return "", errors.New("IPGeolocation is not ready")
 	}
 
 	if ip.To4() != nil {
-		for country := range ig.CIDRListV4 {
-			for _, cidr := range ig.CIDRListV4[country] {
+		for country := range geo.CIDRListV4 {
+			for _, cidr := range geo.CIDRListV4[country] {
 				if cidr.Contains(ip) {
 					return country, nil
 				}
 			}
 		}
 	} else {
-		for country := range ig.CIDRListV6 {
-			for _, cidr := range ig.CIDRListV6[country] {
+		for country := range geo.CIDRListV6 {
+			for _, cidr := range geo.CIDRListV6[country] {
 				if cidr.Contains(ip) {
 					return country, nil
 				}

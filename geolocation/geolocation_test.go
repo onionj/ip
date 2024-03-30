@@ -14,14 +14,14 @@ func TestQueryIPV4(t *testing.T) {
 
 	ipRangeMap[want] = append(ipRangeMap[want], ipNet)
 
-	ipGeoloaction := IPGeolocation{
+	ipGeolocation := IPGeolocation{
 		CIDRListV4: ipRangeMap,
 		Ready:      true,
 	}
 
 	testCase := net.IPv4(byte(1), byte(1), byte(1), byte(1))
 
-	got, err := ipGeoloaction.Query(testCase)
+	got, err := ipGeolocation.Query(testCase)
 	if got != want {
 		t.Errorf("got %q, wanted %q, error: %q", got, want, err.Error())
 	}

@@ -18,7 +18,7 @@ import (
 	"yourip/geolocation"
 )
 
-var version string = "" // set it just in Makefile
+var version = "" // set it just in Makefile
 
 const RESPONSE string = `HTTP/1.1 200 OK
 Content-Length: %d
@@ -26,15 +26,6 @@ Server: Onion
 Content-Type: %s; charset=utf-8
 
 %s`
-
-type ResponseMode int8
-
-const (
-	ResponseModeText ResponseMode = iota
-	ResponseModeHTTPText
-	ResponseModeHTTPJson
-	ResponseModeTextAnimation
-)
 
 const (
 	AnimationModeBanner = "1\n"
@@ -80,11 +71,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	defer listener.Close()
+	defer func(listener *net.TCPListener) {
+		_ = listener.Close()
+	}(listener)
 	fmt.Printf("Start a new listener on %s\nversion:%s\n", tcpAddr.String(), version)
 
 	for ; workers != 0; workers-- {
-		fmt.Println("Runing Worker", workers)
+		fmt.Println("Running Worker", workers)
 		go Worker(listener)
 	}
 
@@ -123,7 +116,7 @@ func handleConnection(conn net.Conn) {
 		}
 	}()
 
-	requestBuffer := make([]byte, 1024)
+	requestBuffer := make([]byte, 2048)
 	bytesRead, err := conn.Read(requestBuffer)
 	if err != nil {
 		if err == io.EOF {
@@ -144,19 +137,22 @@ func handleConnection(conn net.Conn) {
 
 	// for netcat client:
 	if bytesRead <= 1 {
-		conn.Write([]byte(fmt.Sprintf("%s %s", remoteAddrStr, country)))
+		fmt.Printf("(%s) return tcp text response to %s (%s)\n", time.Now().String()[:23], remoteAddrStr, country)
+		_, _ = conn.Write([]byte(fmt.Sprintf("%s %s", remoteAddrStr, country)))
 		return
 	}
 
 	request := string(requestBuffer[:bytesRead])
 
 	if strings.Contains(request, " /json") {
+		fmt.Printf("(%s) return json response to %s (%s)\n", time.Now().String()[:23], remoteAddrStr, country)
+
 		jsonResponseByte, err := json.Marshal(JsonResponse{IP: remoteAddrStr, Country: country})
 		if err != nil {
 			fmt.Println("create json response err:", err)
 			return
 		}
-		conn.Write([]byte(fmt.Sprintf(RESPONSE, len(jsonResponseByte), "application/json", jsonResponseByte)))
+		_, _ = conn.Write([]byte(fmt.Sprintf(RESPONSE, len(jsonResponseByte), "application/json", jsonResponseByte)))
 		return
 
 	} else {
@@ -167,15 +163,16 @@ func handleConnection(conn net.Conn) {
 			return
 		}
 
-		conn.Write([]byte(fmt.Sprintf(RESPONSE, len(ipWithCountry), "text/plain", ipWithCountry)))
+		fmt.Printf("(%s) return http text/plain response to %s (%s)\n", time.Now().String()[:23], remoteAddrStr, country)
+		_, _ = conn.Write([]byte(fmt.Sprintf(RESPONSE, len(ipWithCountry), "text/plain", ipWithCountry)))
 	}
 }
 
-// Stream Client IP Like an Animation (for example client open a tcp connection with netcat and send `1`)
+// StreamAnimation : Stream Client IP Like an Animation (for example client open a tcp connection with netcat and send `1`)
 func StreamAnimation(conn net.Conn, response string, animationMode string) {
 	switch animationMode {
 	case AnimationModeBanner:
-		fmt.Printf("(%s) Stream animation to %s (Banner)\n", time.Now().String()[:23], conn.RemoteAddr().String())
+		fmt.Printf("(%s) Stream animation to %s (Banner)\n", time.Now().String()[:23], response)
 
 		faces := []string{"(^_^)", "[o_o]", "(^.^)", "(\".\")", "($.$)"}
 		randomIndex := rand.Intn(len(faces))
@@ -221,8 +218,8 @@ func StreamAnimation(conn net.Conn, response string, animationMode string) {
 			time.Sleep(time.Second / 5)
 
 			// shift string
-			for indx, lineFlight := range arrayFlight {
-				arrayFlight[indx] = lineFlight[len(lineFlight)-1:] + lineFlight[:len(lineFlight)-1]
+			for index, lineFlight := range arrayFlight {
+				arrayFlight[index] = lineFlight[len(lineFlight)-1:] + lineFlight[:len(lineFlight)-1]
 			}
 
 		}
