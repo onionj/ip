@@ -309,6 +309,11 @@ func (geo *IPGeolocation) Save(filename string) error {
 
 // Load deserializes IPGeolocation from a JSON file
 func (geo *IPGeolocation) Load(filename string) error {
+	if _, err := os.Stat(filename); errors.Is(err, os.ErrNotExist) {
+		geo.Save(filename)
+		return nil
+	}
+
 	data, err := os.ReadFile(filename)
 	if err != nil {
 		return err
@@ -330,11 +335,11 @@ func (geo *IPGeolocation) RefreshData() error {
 	for index, code := range CountriesCodes {
 		err := geo.downloadCIDRContent("https://raw.githubusercontent.com/onionj/country-ip-blocks-alternative/master/ipv4/"+code+".netset", code, newCIDRListV4)
 		if err != nil {
-			return err
+			fmt.Println("err in ipGeolocation.RefreshData", err)
 		}
 		err = geo.downloadCIDRContent("https://raw.githubusercontent.com/onionj/country-ip-blocks-alternative/master/ipv6/"+code+".netset", code, newCIDRListV6)
 		if err != nil {
-			return err
+			fmt.Println("err in ipGeolocation.RefreshData", err)
 		}
 		fmt.Println("Down", code, "CIDR", int32((float32(index+1))/float32(lenCountriesCodes)*100), "% ")
 		fmt.Print("\x0D\u001b[1A")
