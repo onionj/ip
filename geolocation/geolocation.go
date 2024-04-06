@@ -309,6 +309,11 @@ func (geo *IPGeolocation) Save(filename string) error {
 
 // Load deserializes IPGeolocation from a JSON file
 func (geo *IPGeolocation) Load(filename string) error {
+	if _, err := os.Stat(filename); errors.Is(err, os.ErrNotExist) {
+		geo.Save(filename)
+		return nil
+	}
+
 	data, err := os.ReadFile(filename)
 	if err != nil {
 		return err

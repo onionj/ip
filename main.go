@@ -27,6 +27,8 @@ Content-Type: %s; charset=utf-8
 
 %s`
 
+const REFRESHPEROIDH = 200
+
 const (
 	AnimationModeBanner = "1\n"
 	AnimationModeFlight = "2\n"
@@ -56,7 +58,7 @@ func main() {
 	flag.Parse()
 
 	if useIPGeolocation {
-		ipGeolocation = geolocation.New(time.Duration(100))
+		ipGeolocation = geolocation.New(time.Duration(REFRESHPEROIDH))
 	}
 
 	tcpAddr, err := net.ResolveTCPAddr("tcp4", bindAddress)
