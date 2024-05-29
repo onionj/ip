@@ -61,7 +61,7 @@ func main() {
 		ipGeolocation = geolocation.New(time.Duration(REFRESHPEROIDH))
 	}
 
-	tcpAddr, err := net.ResolveTCPAddr("tcp4", bindAddress)
+	tcpAddr, err := net.ResolveTCPAddr("tcp", bindAddress)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Fatal error: %s", err.Error())
 		os.Exit(1)
