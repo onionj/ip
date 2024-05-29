@@ -22,7 +22,6 @@ var CountriesCodes = []string{
 	"al",
 	"am",
 	"ao",
-	"ap",
 	"aq",
 	"ar",
 	"as",
