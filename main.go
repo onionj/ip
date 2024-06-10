@@ -20,12 +20,7 @@ import (
 
 var version = "" // set it just in Makefile
 
-const RESPONSE string = `HTTP/1.1 200 OK
-Content-Length: %d
-Server: Onion
-Content-Type: %s; charset=utf-8
-
-%s`
+const RESPONSE string = "HTTP/1.1 200 OK\r\nContent-Length: %d\r\nServer: Onion\r\nContent-Type: %s; charset=utf-8\r\n\r\n%s"
 
 const REFRESHPEROIDH = 200
 
